@@ -63,6 +63,12 @@
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
+  var fmtMesCorto = new Intl.DateTimeFormat('es-ES', { month: 'short' });
+  function nombreMesCorto(anio, mes) {
+    var s = fmtMesCorto.format(new Date(anio, mes, 1)).replace('.', '');
+    return s.charAt(0).toUpperCase() + s.slice(1) + ' ' + String(anio).slice(2);
+  }
+
   function num(n, dec) {
     if (n === null || n === undefined || isNaN(n)) return '—';
     return n.toLocaleString('es-ES', { maximumFractionDigits: dec === undefined ? 1 : dec });
@@ -113,6 +119,7 @@
     if (vista === 'medicacion') pintarMeds();
     if (vista === 'informe') pintarInforme();
     if (vista === 'registrar') pintarSelectsTomas();
+    if (vista === 'test') pintarTest();
     window.scrollTo(0, 0);
   }
 
@@ -305,14 +312,65 @@
     });
   }
 
+  // Meses desde el primero con datos hasta el actual, del más reciente al más antiguo.
+  function mesesConDatos() {
+    var fechas = datos.episodios.map(function (e) { return e.inicio.slice(0, 7); })
+      .concat((datos.inyecciones || []).map(function (x) { return x.fecha.slice(0, 7); })).sort();
+    if (!fechas.length) return [];
+    var meses = [];
+    var f = E.parseFecha(fechas[0] + '-01');
+    var fin = hoy().slice(0, 7);
+    if (fechas[fechas.length - 1] > fin) fin = fechas[fechas.length - 1];
+    for (; E.aDia(f).slice(0, 7) <= fin; f.setMonth(f.getMonth() + 1)) meses.push(E.aDia(f).slice(0, 7));
+    return meses.reverse();
+  }
+
+  function resumenDeMes(mes) {
+    var p = mes.split('-').map(Number);
+    var desde = mes + '-01';
+    var hasta = E.aDia(new Date(p[0], p[1], 0));
+    var r = E.resumen(datos.episodios, datos.meds, desde, hasta);
+    var niveles = [0, 0, 0, 0];
+    Object.keys(r.intensidadPorDia).forEach(function (d) { niveles[nivel(r.intensidadPorDia[d])]++; });
+    var tomas = Object.keys(r.tomasPorDia).reduce(function (n, d) { return n + r.tomasPorDia[d].length; }, 0);
+    var iny = (datos.inyecciones || []).filter(function (x) { return x.fecha.slice(0, 7) === mes; })
+      .map(function (x) { return Number(x.fecha.slice(8)); }).sort(function (a, b) { return a - b; });
+    return { mes: mes, anio: p[0], m: p[1] - 1, r: r, niveles: niveles, tomas: tomas, iny: iny, enCurso: mes === hoy().slice(0, 7) };
+  }
+
   function pintarHistorial() {
     var cont = $('#lista-episodios');
-    if (!datos.episodios.length) {
-      cont.innerHTML = '<p class="vacio">Aún no hay episodios. Registra el primero en <a href="#" data-ir="registrar">Registrar</a>.</p>';
+    var tabla = $('#resumen-meses');
+    var meses = mesesConDatos();
+    if (!meses.length) {
+      tabla.innerHTML = '';
+      cont.innerHTML = '<p class="vacio">Aún no hay nada apuntado. Registra un episodio en <a href="#" data-ir="registrar">Registrar</a>, ' +
+        'o carga tu copia en <a href="#" data-ir="datos">Datos</a>.</p>';
       return;
     }
-    var eps = datos.episodios.slice().sort(function (a, b) { return b.inicio.localeCompare(a.inicio); });
-    cont.innerHTML = eps.map(tarjetaEpisodio).join('');
+    var res = meses.map(resumenDeMes);
+    tabla.innerHTML = '<div class="tabla-caja"><table class="tabla resumen"><thead><tr><th>Mes</th>' +
+      '<th class="num">Días con dolor</th><th class="num">Días intensos</th><th class="num">Media (1–10)</th>' +
+      '<th class="num">Días con medic.</th><th class="num">Pasti&shy;llas</th><th class="num">Día prev.</th>' +
+      '</tr></thead><tbody>' + res.map(function (x) {
+        var alerta = x.r.abuso.some(function (a) { return a.alertas.length; });
+        return '<tr' + (alerta ? ' class="fila-alerta"' : '') + '><td>' + nombreMesCorto(x.anio, x.m) + (x.enCurso ? '*' : '') + '</td>' +
+          '<td class="num"><b>' + x.r.diasCefalea + '</b></td><td class="num">' + x.niveles[3] + '</td><td class="num">' +
+          num(x.r.intensidadMedia) + '</td><td class="num">' + x.r.diasMedicacionAguda + '</td><td class="num">' + x.tomas +
+          '</td><td class="num">' + (x.iny.length ? x.iny.join(', ') : '—') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<p class="ayuda">* mes en curso. Días intensos: 7 o más sobre 10. Pastillas: tomas para la crisis. Día prev.: día del preventivo (Emgality). ' +
+      'En rojo, los meses con posible uso excesivo de medicación.</p>';
+
+    var porMes = {};
+    datos.episodios.forEach(function (e) { (porMes[e.inicio.slice(0, 7)] = porMes[e.inicio.slice(0, 7)] || []).push(e); });
+    cont.innerHTML = res.map(function (x, k) {
+      var eps = (porMes[x.mes] || []).slice().sort(function (a, b) { return b.inicio.localeCompare(a.inicio); });
+      if (!eps.length) return '';
+      return '<details class="mes-detalle"' + (k === 0 ? ' open' : '') + '><summary>' + nombreMes(x.anio, x.m) +
+        ' <span class="ayuda">· ' + eps.length + (eps.length === 1 ? ' episodio' : ' episodios') + '</span></summary>' +
+        eps.map(tarjetaEpisodio).join('') + '</details>';
+    }).join('');
   }
 
   function tarjetaEpisodio(ep) {
@@ -590,7 +648,9 @@
   inDesde.addEventListener('change', pintarInforme);
   inHasta.addEventListener('change', pintarInforme);
   $('#imprimir').addEventListener('click', function () { window.print(); });
-  window.addEventListener('beforeprint', pintarInforme);
+  window.addEventListener('beforeprint', function () {
+    if (!document.body.classList.contains('imprimiendo-tests')) pintarInforme();
+  });
 
   function tablaFrecuencias(titulo, lista, total, etiquetas) {
     if (!lista.length) return '';
@@ -718,6 +778,214 @@
 
     cont.innerHTML = html;
   }
+
+  // ---------- tests ----------
+
+  var T = window.Tests;
+  var testActual = 'asc12';
+
+  function respuestas() { return datos.tests.r; }
+
+  function cambiarTest(clave, valor) {
+    if (valor === undefined || isNaN(valor)) delete datos.tests.r[clave];
+    else datos.tests.r[clave] = valor;
+    persistir();
+  }
+
+  function fechaTexto(f) {
+    var p = f.split('-').map(Number);
+    return p[2] + ' de ' + nombreMes(p[0], p[1] - 1).toLowerCase();
+  }
+
+  // Lo que dice el diario en un periodo, para ayudar a contestar MIDAS y HIT-6.
+  function estadisticasDiario(desde, hasta) {
+    var porDia = E.intensidadPorDia(datos.episodios, desde, hasta);
+    var r = { conDolor: 0, b1: 0, b2: 0, b3: 0, sumaN: 0, maxN: 0 };
+    Object.keys(porDia).forEach(function (d) {
+      var n = porDia[d];
+      if (!n) return;
+      r.conDolor++;
+      r['b' + nivel(n)]++;
+      r.sumaN += n;
+      r.maxN = Math.max(r.maxN, n);
+    });
+    var dias = datos.episodios.map(function (e) { var ds = E.diasDeEpisodio(e); return ds[ds.length - 1]; }).sort();
+    r.ultimo = dias.length ? dias[dias.length - 1] : null;
+    return r;
+  }
+
+  function avisoHuecos(hasta, ultimo) {
+    if (!ultimo) return 'Tu diario está vacío: todo saldría como días sin dolor.';
+    var dias = Math.round((E.parseFecha(hasta) - E.parseFecha(ultimo)) / 864e5);
+    if (dias > 14) return 'Ojo: el último día apuntado es el ' + fechaTexto(ultimo) + '. Los ' + dias +
+      ' días siguientes cuentan como días sin dolor. Si tuviste dolor, apúntalo antes.';
+    return null;
+  }
+
+  function ayudaDiario(clave) {
+    var lin = [], boton = '';
+    if (clave === 'midasA' || clave === 'midasB') {
+      var hasta = datos.tests.midasHasta || hoy();
+      var inicio = E.parseFecha(hasta);
+      inicio.setMonth(inicio.getMonth() - 3);
+      var desde = E.sumarDias(E.aDia(inicio), 1);
+      var e = estadisticasDiario(desde, hasta);
+      lin.push('Tu diario, del ' + fechaTexto(desde) + ' al ' + fechaTexto(hasta) + ': ' + e.conDolor + ' días con dolor.');
+      if (clave === 'midasB') {
+        lin.push(e.conDolor ? 'Intensidad media: ' + num(e.sumaN / e.conDolor) + ' sobre 10. Máximo: ' + e.maxN + '.'
+          : 'No hay días con dolor apuntados en ese periodo.');
+      }
+      var aviso = avisoHuecos(hasta, e.ultimo);
+      if (aviso) lin.push(aviso);
+      var valor = clave === 'midasA' ? e.conDolor : (e.conDolor ? Math.round(e.sumaN / e.conDolor) : null);
+      if (valor !== null) {
+        boton = '<button type="button" class="secundario" data-usar="midas.' + (clave === 'midasA' ? 'a' : 'b') + '" data-valor="' + valor + '">' +
+          (clave === 'midasA' ? 'Usar ' + valor + ' en la A' : 'Usar la media (' + valor + ') en la B') + '</button>';
+      }
+    } else if (clave === 'hit1') {
+      var h = hoy(), d = E.sumarDias(h, -27);
+      var e2 = estadisticasDiario(d, h);
+      lin.push('Tu diario, últimas 4 semanas: ' + e2.conDolor + ' días con dolor. Leves ' + e2.b1 + ', moderados ' + e2.b2 +
+        ', intensos ' + e2.b3 + (e2.conDolor ? ' (' + Math.round(e2.b3 / e2.conDolor * 100) + ' % intensos)' : '') + '.');
+      var aviso2 = avisoHuecos(h, e2.ultimo);
+      if (aviso2) lin.push(aviso2);
+      lin.push('Es solo una ayuda. La respuesta la eliges tú.');
+    } else return '';
+    return '<div class="ayuda-diario">' + lin.map(function (l) { return '<p>' + esc(l) + '</p>'; }).join('') +
+      (boton ? '<div class="acciones">' + boton + '</div>' : '') + '</div>';
+  }
+
+  function enunciado(it) {
+    return (it.n !== undefined && !/^\d+\)|^\d+\./.test(it.txt) ? it.n + '. ' : '') + it.txt;
+  }
+
+  function pintarNavTest() {
+    $('#test-nav').innerHTML = T.TESTS.map(function (t) {
+      var p = T.progresoTest(t, respuestas());
+      return '<button type="button" class="chip-test' + (t.id === testActual ? ' activo' : '') + (p.resp === p.total ? ' completo' : '') +
+        '" data-test="' + t.id + '" aria-pressed="' + (t.id === testActual) + '">' + esc(t.corto) + ' <small>' + p.resp + '/' + p.total + '</small></button>';
+    }).join('');
+  }
+
+  function htmlResultado(t) {
+    var r = t.res(t, respuestas());
+    var html = '<h4>' + (r.hecho ? 'Resultado' : 'Resultado provisional (faltan respuestas)') + '</h4>' +
+      r.lineas.map(function (l) { return '<p>' + esc(l) + '</p>'; }).join('') + '<p class="ayuda">' + esc(t.nota) + '</p>';
+    if (t.id === 'bdi' && respuestas()['bdi.i9'] > 0) {
+      html += '<p class="alerta">En la pregunta 9 has marcado algo distinto de 0. Coméntalo pronto con tu neuróloga o tu médico. ' +
+        'Si en algún momento lo pasas muy mal, en España puedes llamar al 024 (atención a la conducta suicida, gratis y a cualquier hora).</p>';
+    }
+    return html;
+  }
+
+  function pintarTest() {
+    pintarNavTest();
+    var t = T.TESTS.find(function (x) { return x.id === testActual; });
+    var r = respuestas();
+    var html = '<h3>' + esc(t.titulo) + '</h3><p class="ayuda">' + esc(t.intro) + '</p>';
+    t.items.forEach(function (it) {
+      var clave = t.id + '.' + it.id;
+      var v = r[clave];
+      html += '<div class="pregunta"><p class="enunciado">' + esc(enunciado(it)) + '</p>';
+      if (t.id === 'midas' && it.id === 'a') {
+        html += '<label class="midas-hasta">Contar los 3 meses hasta el día <input type="date" id="midas-hasta" value="' +
+          esc(datos.tests.midasHasta || hoy()) + '"></label>';
+      }
+      if (it.ayuda) html += ayudaDiario(it.ayuda);
+      if (it.num) {
+        html += '<input type="number" inputmode="numeric" class="num-test" data-clave="' + clave + '" min="' + it.num.min +
+          '" max="' + it.num.max + '" value="' + (v === undefined ? '' : v) + '" aria-label="' + esc(it.txt) + '">';
+      } else {
+        var ops = it.ops || t.ops;
+        var columna = t.columna || ops.some(function (o) { return o.t.length > 28; });
+        html += '<div class="' + (columna ? 'ops-col' : 'ops-fila') + '">' + ops.map(function (o, i) {
+          return '<button type="button" class="opcion' + (v === i ? ' activo' : '') + '" data-clave="' + clave + '" data-op="' + i +
+            '" aria-pressed="' + (v === i) + '">' + esc(o.t) + '</button>';
+        }).join('') + '</div>';
+      }
+      html += '</div>';
+    });
+    html += '<div class="resultado" id="test-resultado">' + htmlResultado(t) + '</div>';
+    $('#test-cuerpo').innerHTML = html;
+  }
+
+  $('#test-nav').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-test]');
+    if (!b) return;
+    testActual = b.dataset.test;
+    pintarTest();
+    $('#test-nav').scrollIntoView({ block: 'start' });
+  });
+
+  $('#test-cuerpo').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button');
+    if (!b) return;
+    if (b.dataset.op !== undefined) {
+      var i = Number(b.dataset.op);
+      cambiarTest(b.dataset.clave, respuestas()[b.dataset.clave] === i ? undefined : i);
+      var y = window.scrollY;
+      pintarTest();
+      window.scrollTo(0, y);
+    }
+    if (b.dataset.usar) {
+      cambiarTest(b.dataset.usar, Number(b.dataset.valor));
+      var y2 = window.scrollY;
+      pintarTest();
+      window.scrollTo(0, y2);
+    }
+  });
+
+  $('#test-cuerpo').addEventListener('input', function (ev) {
+    var inp = ev.target;
+    if (!inp.classList.contains('num-test')) return;
+    var v = inp.value === '' ? undefined : Math.min(Number(inp.max), Math.max(Number(inp.min), Math.round(Number(inp.value))));
+    cambiarTest(inp.dataset.clave, v);
+    pintarNavTest();
+    $('#test-resultado').innerHTML = htmlResultado(T.TESTS.find(function (x) { return x.id === testActual; }));
+  });
+
+  $('#test-cuerpo').addEventListener('change', function (ev) {
+    if (ev.target.id !== 'midas-hasta') return;
+    datos.tests.midasHasta = ev.target.value || '';
+    persistir();
+    pintarTest();
+  });
+
+  $('#test-borrar-uno').addEventListener('click', function () {
+    var t = T.TESTS.find(function (x) { return x.id === testActual; });
+    if (!confirm('¿Borrar todas las respuestas de ' + t.corto + '?')) return;
+    Object.keys(datos.tests.r).forEach(function (k) { if (k.indexOf(testActual + '.') === 0) delete datos.tests.r[k]; });
+    persistir();
+    pintarTest();
+  });
+
+  // Hoja imprimible: preguntas con la opción marcada y el resultado.
+  function hojaTest(t) {
+    var r = respuestas();
+    return '<section class="hoja-test"><h2>' + esc(t.titulo) + '</h2>' +
+      '<p>' + (datos.ajustes.paciente ? 'Nombre: ' + esc(datos.ajustes.paciente) + ' · ' : '') + 'Fecha: ' + fechaCorta(hoy()) + '</p>' +
+      '<p class="intro">' + esc(t.intro) + '</p>' +
+      t.items.map(function (it) {
+        var v = r[t.id + '.' + it.id];
+        var cuerpo = it.num ? '<p>Respuesta: <b>' + (v === undefined ? '______' : v) + '</b></p>'
+          : '<p class="ops-imp">' + (it.ops || t.ops).map(function (o, i) {
+            return '<span>' + (v === i ? '&#9746;' : '&#9744;') + ' ' + esc(o.t) + '</span>';
+          }).join(' ') + '</p>';
+        return '<div class="item-imp"><p><b>' + esc(enunciado(it)) + '</b></p>' + cuerpo + '</div>';
+      }).join('') + '<div class="resultado">' + htmlResultado(t) + '</div></section>';
+  }
+
+  function imprimirTests(lista) {
+    $('#hojas-test').innerHTML = lista.map(hojaTest).join('');
+    document.body.classList.add('imprimiendo-tests');
+    window.print();
+  }
+  window.addEventListener('afterprint', function () { document.body.classList.remove('imprimiendo-tests'); });
+
+  $('#test-imprimir-uno').addEventListener('click', function () {
+    imprimirTests([T.TESTS.find(function (x) { return x.id === testActual; })]);
+  });
+  $('#test-imprimir-todos').addEventListener('click', function () { imprimirTests(T.TESTS); });
 
   // ---------- datos y ajustes ----------
 

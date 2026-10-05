@@ -288,6 +288,44 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .rejilla-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 24px; }
 .tabla.detalle td { font-size: 0.85rem; }
 
+/* ---------- resumen ---------- */
+
+.tabla-caja { overflow-x: auto; margin-bottom: 8px; }
+.tabla.resumen { font-size: 0.88rem; }
+.tabla.resumen th { font-size: 0.75rem; line-height: 1.2; vertical-align: bottom; }
+.tabla.resumen td { white-space: nowrap; padding: 6px 3px; }
+.tabla.resumen th { padding: 4px; }
+.mes-detalle { border: 1px solid var(--borde); border-radius: 10px; background: var(--superficie); margin-bottom: 8px; }
+.mes-detalle > summary { padding: 12px 14px; cursor: pointer; font-weight: 600; }
+.mes-detalle[open] > summary { border-bottom: 1px solid var(--borde); }
+.mes-detalle .tarjeta { border: 0; border-bottom: 1px solid var(--borde); border-radius: 0; margin: 0; }
+.mes-detalle .tarjeta:last-child { border-bottom: 0; }
+
+/* ---------- tests ---------- */
+
+.chips-test { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.chip-test { gap: 4px; background: transparent; color: var(--texto); border-color: var(--borde); border-radius: 999px; padding: 6px 12px; }
+.chip-test small { color: var(--suave); }
+.chip-test.completo { border-color: var(--acento); }
+.chip-test.activo { background: var(--acento); border-color: var(--acento); color: var(--acento-texto); }
+.chip-test.activo small { color: inherit; }
+.pregunta { border-top: 1px solid var(--borde); padding: 12px 0; }
+.enunciado { margin: 0 0 8px; font-weight: 600; }
+.ops-fila { display: flex; flex-wrap: wrap; gap: 6px; }
+.ops-col { display: flex; flex-direction: column; gap: 6px; }
+.opcion { background: var(--superficie); color: var(--texto); border-color: var(--borde); text-align: left; }
+.opcion.activo { background: var(--acento); color: var(--acento-texto); border-color: var(--acento); }
+.num-test { max-width: 8em; }
+.midas-hasta { margin-bottom: 8px; }
+.midas-hasta input { max-width: 12em; }
+.ayuda-diario { border-left: 4px solid var(--acento); background: var(--superficie); border-radius: 6px; padding: 8px 12px; margin: 8px 0; font-size: 0.92rem; }
+.ayuda-diario p { margin: 0 0 6px; }
+.resultado { border: 2px solid var(--texto); border-radius: 10px; padding: 12px; margin: 16px 0; background: var(--superficie); }
+.resultado h4 { margin: 0 0 6px; }
+.resultado p { margin: 4px 0; }
+.resultado .alerta { margin-top: 10px; }
+.solo-imprimir { display: none; }
+
 /* ---------- aviso ---------- */
 
 .aviso {
@@ -323,4 +361,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .bloque.salto { break-inside: auto; }
   .tabla tr { break-inside: avoid; }
   .meses { grid-template-columns: repeat(3, 1fr); }
+
+  /* Al imprimir tests se sustituye el informe por las hojas de los tests. */
+  body.imprimiendo-tests #vista-informe { display: none !important; }
+  body.imprimiendo-tests #vista-test { display: block !important; }
+  body.imprimiendo-tests .solo-imprimir { display: block; }
+  .hoja-test { break-before: page; }
+  .hoja-test:first-child { break-before: auto; }
+  .hoja-test h2 { font-size: 15pt; margin: 0 0 4px; }
+  .hoja-test .intro { color: #333; }
+  .item-imp { break-inside: avoid; margin: 6px 0; }
+  .item-imp p { margin: 0 0 2px; }
+  .ops-imp span { display: inline-block; margin-right: 12px; }
 }
