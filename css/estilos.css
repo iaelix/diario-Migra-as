@@ -234,6 +234,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .dia.hoy { outline: 2px solid var(--acento); }
 .dia .punto-med { position: absolute; right: 4px; bottom: 2px; font-size: 0.7rem; }
 .punto-med { color: var(--acento); }
+.dia .punto-iny { position: absolute; right: 4px; top: 2px; font-size: 0.6rem; }
+.punto-iny { color: #1a7f5a; }
+.nivel-3 .punto-iny, .nivel-2 .punto-iny { color: #fff; }
+#bloque-iny { margin-top: 24px; }
 .nivel-3 .punto-med { color: #fff; }
 
 .leyenda { display: flex; flex-wrap: wrap; gap: 14px; margin: 12px 0; font-size: 0.85rem; color: var(--suave); }
@@ -275,6 +279,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .mes-informe .mes { gap: 2px; }
 .mes-informe .dia { font-size: 0.7rem; padding: 1px 3px; border-radius: 3px; }
 .mes-informe .dia .punto-med { font-size: 0.55rem; right: 2px; bottom: 0; }
+.mes-informe .dia .punto-iny { font-size: 0.45rem; right: 2px; top: 0; }
 .rejilla-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 24px; }
 .tabla.detalle td { font-size: 0.85rem; }
 

@@ -12,7 +12,8 @@
     localizacion: ['lado izquierdo', 'lado derecho', 'ambos lados', 'frente', 'sienes', 'detrás de los ojos', 'nuca', 'toda la cabeza'],
     caracter: ['pulsátil', 'opresivo', 'punzante', 'quemante'],
     sintomas: ['náuseas', 'vómitos', 'fotofobia', 'fonofobia', 'osmofobia', 'mareo', 'empeora al moverme', 'congestión / lagrimeo'],
-    desencadenantes: ['estrés', 'poco sueño', 'mucho sueño', 'menstruación', 'ayuno / saltar comida', 'alcohol', 'cafeína', 'cambio de tiempo', 'pantallas', 'ejercicio intenso', 'luz intensa', 'deshidratación']
+    desencadenantes: ['estrés', 'poco sueño', 'mucho sueño', 'menstruación', 'ayuno / saltar comida', 'alcohol', 'cafeína', 'cambio de tiempo', 'pantallas', 'ejercicio intenso', 'luz intensa', 'deshidratación',
+      'cuello / espalda cargados', 'turno de noche', 'cambio de horario', 'olores fuertes', 'algún alimento']
   };
 
   var TIPOS = {
@@ -55,6 +56,8 @@
   function fechaLarga(dia) { return fmtFecha.format(E.parseFecha(dia)); }
   function fechaCorta(dia) { return fmtFechaCorta.format(E.parseFecha(dia)); }
   function hora(fh) { return fh ? fh.slice(11, 16) : ''; }
+  // Los episodios importados del diario anterior solo tienen fecha, sin hora.
+  function paraInput(fh) { return fh && fh.length === 10 ? fh + 'T00:00' : fh; }
   function nombreMes(anio, mes) {
     var s = fmtMes.format(new Date(anio, mes, 1));
     return s.charAt(0).toUpperCase() + s.slice(1);
@@ -146,7 +149,7 @@
     div.className = 'toma';
     div.innerHTML =
       '<select class="toma-med" aria-label="Medicamento">' + opcionesMeds(toma.medId) + '</select>' +
-      '<input type="datetime-local" class="toma-hora" aria-label="Hora de la toma" value="' + esc(toma.hora) + '">' +
+      '<input type="datetime-local" class="toma-hora" aria-label="Hora de la toma" value="' + esc(paraInput(toma.hora)) + '">' +
       '<select class="toma-eficacia" aria-label="Efecto">' +
       Object.keys(EFICACIA).map(function (k) {
         return '<option value="' + k + '"' + (k === (toma.eficacia || '') ? ' selected' : '') + '>' + EFICACIA[k] + '</option>';
@@ -189,7 +192,7 @@
     mostrar('registrar');
     limpiarFormulario();
     form.id.value = ep.id;
-    form.inicio.value = ep.inicio;
+    form.inicio.value = paraInput(ep.inicio);
     form.fin.value = ep.fin || '';
     form.enCurso.checked = !ep.fin;
     form.fin.disabled = !ep.fin;
@@ -264,11 +267,26 @@
   function descripcionEpisodio(ep) {
     var partes = [];
     var dur = E.duracionHoras(ep);
-    partes.push(ep.fin ? 'duración ' + horas(dur) : '<em>en curso / sin fin</em>');
+    partes.push(ep.fin ? 'duración ' + horas(dur) : '<em>sin hora de fin</em>');
     if (ep.aura) partes.push('con aura');
     var lista = [].concat(ep.localizacion || [], ep.caracter || [], ep.sintomas || []);
     if (lista.length) partes.push(esc(lista.join(', ')));
     return partes.join(' · ');
+  }
+
+  // Junta tomas idénticas: "Relert 40 mg ×2" en vez de repetir la línea.
+  function textoTomas(ep) {
+    var grupos = [];
+    (ep.tomas || []).forEach(function (t) {
+      var g = grupos.find(function (x) { return x.medId === t.medId && x.hora === t.hora && x.eficacia === (t.eficacia || ''); });
+      if (g) g.n++;
+      else grupos.push({ medId: t.medId, hora: t.hora, eficacia: t.eficacia || '', n: 1 });
+    });
+    return grupos.map(function (g) {
+      var m = medPorId(g.medId);
+      return esc(m ? m.nombre : '(medicamento borrado)') + (g.n > 1 ? ' ×' + g.n : '') +
+        (hora(g.hora) ? ' ' + hora(g.hora) : '') + (g.eficacia ? ' (' + EFICACIA[g.eficacia] + ')' : '');
+    });
   }
 
   function pintarHistorial() {
@@ -279,14 +297,11 @@
     }
     var eps = datos.episodios.slice().sort(function (a, b) { return b.inicio.localeCompare(a.inicio); });
     cont.innerHTML = eps.map(function (ep) {
-      var tomas = (ep.tomas || []).map(function (t) {
-        var m = medPorId(t.medId);
-        return esc(m ? m.nombre : '(medicamento borrado)') + ' ' + hora(t.hora) + (t.eficacia ? ' — ' + EFICACIA[t.eficacia] : '');
-      });
+      var tomas = textoTomas(ep);
       return '<article class="tarjeta">' +
         '<div class="intensidad nivel-' + nivel(ep.intensidad) + '">' + ep.intensidad + '</div>' +
         '<div class="cuerpo">' +
-        '<h3>' + esc(fechaLarga(ep.inicio.slice(0, 10))) + ' · ' + hora(ep.inicio) + '</h3>' +
+        '<h3>' + esc(fechaLarga(ep.inicio.slice(0, 10))) + (hora(ep.inicio) ? ' · ' + hora(ep.inicio) : '') + '</h3>' +
         '<p>' + descripcionEpisodio(ep) + '</p>' +
         (ep.desencadenantes && ep.desencadenantes.length ? '<p class="ayuda">Desencadenantes: ' + esc(ep.desencadenantes.join(', ')) + '</p>' : '') +
         (tomas.length ? '<p class="ayuda">Medicación: ' + tomas.join('; ') + '</p>' : '') +
@@ -312,7 +327,18 @@
 
   // ---------- calendario ----------
 
+  // Días con administración de un preventivo (p. ej. inyección mensual): { "YYYY-MM-DD": ["Emgality…"] }
+  function inyeccionesPorDia() {
+    var r = {};
+    (datos.inyecciones || []).forEach(function (x) {
+      var m = medPorId(x.medId);
+      (r[x.fecha] = r[x.fecha] || []).push(m ? m.nombre : 'preventivo');
+    });
+    return r;
+  }
+
   function htmlMes(anio, mes, porDia, tomas) {
+    var iny = inyeccionesPorDia();
     var primero = new Date(anio, mes, 1);
     var hueco = (primero.getDay() + 6) % 7; // lunes = 0
     var diasMes = new Date(anio, mes + 1, 0).getDate();
@@ -324,9 +350,11 @@
       var i2 = porDia[dia];
       var titulo = i2 !== undefined ? 'Intensidad ' + i2 : 'Sin dolor';
       if (tomas[dia]) titulo += ', medicación aguda';
+      if (iny[dia]) titulo += ', ' + iny[dia].join(', ');
       celdas.push('<div class="dia nivel-' + (i2 !== undefined ? Math.max(1, nivel(i2)) : 0) +
         (dia === hoyStr ? ' hoy' : '') + '" title="' + titulo + '">' + d +
-        (tomas[dia] ? '<b class="punto-med">●</b>' : '') + '</div>');
+        (tomas[dia] ? '<b class="punto-med">●</b>' : '') +
+        (iny[dia] ? '<b class="punto-iny">▲</b>' : '') + '</div>');
     }
     return '<div class="mes">' + celdas.join('') + '</div>';
   }
@@ -353,18 +381,54 @@
     var cont = $('#lista-meds');
     if (!datos.meds.length) {
       cont.innerHTML = '<p class="vacio">Añade los medicamentos que usas para las crisis y los preventivos.</p>';
+      pintarInyecciones();
       return;
     }
     cont.innerHTML = '<table class="tabla"><thead><tr><th>Medicamento</th><th>Tipo</th><th>Tomas registradas</th><th></th></tr></thead><tbody>' +
       datos.meds.map(function (m) {
         var n = datos.episodios.reduce(function (acc, e) {
           return acc + (e.tomas || []).filter(function (t) { return t.medId === m.id; }).length;
-        }, 0);
+        }, 0) + (datos.inyecciones || []).filter(function (x) { return x.medId === m.id; }).length;
         return '<tr><td>' + esc(m.nombre) + '</td><td>' + esc(TIPOS[m.tipo] || m.tipo) + '</td><td>' + n + '</td>' +
           '<td class="botones"><button type="button" class="secundario" data-editar-med="' + esc(m.id) + '">Editar</button>' +
           '<button type="button" class="peligro" data-borrar-med="' + esc(m.id) + '">Borrar</button></td></tr>';
       }).join('') + '</tbody></table>';
+    pintarInyecciones();
   }
+
+  var formIny = $('#form-iny');
+
+  function pintarInyecciones() {
+    var prev = datos.meds.filter(function (m) { return m.tipo === 'preventivo'; });
+    $('#bloque-iny').hidden = !prev.length;
+    formIny.medId.innerHTML = prev.map(function (m) {
+      return '<option value="' + esc(m.id) + '">' + esc(m.nombre) + '</option>';
+    }).join('');
+    if (!formIny.fecha.value) formIny.fecha.value = hoy();
+    var lista = (datos.inyecciones || []).slice().sort(function (a, b) { return b.fecha.localeCompare(a.fecha); });
+    $('#lista-iny').innerHTML = lista.length ? '<table class="tabla"><tbody>' + lista.map(function (x) {
+      var m = medPorId(x.medId);
+      return '<tr><td>' + fechaCorta(x.fecha) + '</td><td>' + esc(m ? m.nombre : '(medicamento borrado)') + '</td>' +
+        '<td class="botones"><button type="button" class="peligro" data-borrar-iny="' + esc(x.id) + '">Borrar</button></td></tr>';
+    }).join('') + '</tbody></table>' : '<p class="ayuda">Todavía no hay administraciones registradas.</p>';
+  }
+
+  formIny.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (!formIny.medId.value || !formIny.fecha.value) return;
+    datos.inyecciones.push({ id: D.id(), medId: formIny.medId.value, fecha: formIny.fecha.value });
+    persistir();
+    pintarInyecciones();
+    avisar('Administración registrada.');
+  });
+
+  $('#lista-iny').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-borrar-iny]');
+    if (!b || !confirm('¿Borrar esta administración?')) return;
+    datos.inyecciones = datos.inyecciones.filter(function (x) { return x.id !== b.dataset.borrarIny; });
+    persistir();
+    pintarInyecciones();
+  });
 
   formMed.addEventListener('submit', function (ev) {
     ev.preventDefault();
@@ -489,7 +553,8 @@
         htmlMes(f.getFullYear(), f.getMonth(), r.intensidadPorDia, r.tomasPorDia) + '</div>';
     }
     html += '</div><div class="leyenda"><span><i class="nivel-1"></i> leve</span><span><i class="nivel-2"></i> moderado</span>' +
-      '<span><i class="nivel-3"></i> intenso</span><span><b class="punto-med">●</b> medicación aguda</span></div></div>';
+      '<span><i class="nivel-3"></i> intenso</span><span><b class="punto-med">●</b> medicación aguda</span>' +
+      ((datos.inyecciones || []).length ? '<span><b class="punto-iny">▲</b> preventivo administrado</span>' : '') + '</div></div>';
 
     // Uso de medicación por mes
     if (r.abuso.length) {
@@ -518,7 +583,12 @@
 
     var preventivos = datos.meds.filter(function (m) { return m.tipo === 'preventivo'; });
     if (preventivos.length) {
-      html += '<div class="bloque"><h3>Tratamiento preventivo</h3><p>' + preventivos.map(function (m) { return esc(m.nombre); }).join(', ') + '</p></div>';
+      html += '<div class="bloque"><h3>Tratamiento preventivo</h3><ul>' + preventivos.map(function (m) {
+        var fechas = (datos.inyecciones || []).filter(function (x) {
+          return x.medId === m.id && x.fecha >= desde && x.fecha <= hasta;
+        }).map(function (x) { return x.fecha; }).sort();
+        return '<li>' + esc(m.nombre) + (fechas.length ? ': administrado el ' + fechas.map(fechaCorta).join(', ') : '') + '</li>';
+      }).join('') + '</ul></div>';
     }
 
     html += '<div class="rejilla-2">' +
@@ -526,7 +596,8 @@
       tablaFrecuencias('Desencadenantes señalados', r.desencadenantes, r.numEpisodios) +
       tablaFrecuencias('Localización', r.localizacion, r.numEpisodios) +
       tablaFrecuencias('Tipo de dolor', r.caracter, r.numEpisodios) +
-      tablaFrecuencias('Limitación de la actividad', r.discapacidad, r.numEpisodios, DISCAPACIDAD) +
+      (r.discapacidad.some(function (x) { return x.clave !== 'sin dato'; })
+        ? tablaFrecuencias('Limitación de la actividad', r.discapacidad, r.numEpisodios, DISCAPACIDAD) : '') +
       '</div>';
 
     html += '<div class="bloque salto"><h3>Detalle de episodios</h3><table class="tabla detalle"><thead><tr>' +
@@ -534,10 +605,7 @@
       r.episodios.map(function (ep) {
         var sint = (ep.sintomas || []).slice();
         if (ep.aura) sint.unshift('aura');
-        var tomas = (ep.tomas || []).map(function (t) {
-          var m = medPorId(t.medId);
-          return esc(m ? m.nombre : '?') + ' ' + hora(t.hora) + (t.eficacia ? ' (' + EFICACIA[t.eficacia] + ')' : '');
-        });
+        var tomas = textoTomas(ep);
         return '<tr><td>' + fechaCorta(ep.inicio.slice(0, 10)) + ' ' + hora(ep.inicio) + '</td><td>' + horas(E.duracionHoras(ep)) +
           '</td><td class="num">' + ep.intensidad + '</td><td>' + esc(sint.join(', ')) + '</td><td>' + tomas.join('<br>') +
           '</td><td>' + esc(ep.notas || '') + '</td></tr>';
