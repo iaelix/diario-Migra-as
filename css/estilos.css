@@ -232,6 +232,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   font-size: 0.85rem;
 }
 .dia.hoy { outline: 2px solid var(--acento); }
+#calendario .dia { cursor: pointer; }
+#calendario .dia.seleccionado { outline: 3px solid var(--texto); outline-offset: 1px; }
+#detalle-dia { margin-top: 12px; padding: 12px; border: 1px solid var(--borde); border-radius: 10px; background: var(--superficie); }
+#detalle-dia h3 { margin-bottom: 10px; }
+#detalle-dia .fila-iny { display: flex; align-items: center; gap: 8px; }
 .dia .punto-med { position: absolute; right: 4px; bottom: 2px; font-size: 0.7rem; }
 .punto-med { color: var(--acento); }
 .dia .punto-iny { position: absolute; right: 4px; top: 2px; font-size: 0.6rem; }
