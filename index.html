@@ -81,6 +81,7 @@
         <div class="acciones">
           <button type="submit">Guardar episodio</button>
           <button type="button" id="cancelar-edicion" class="secundario" hidden>Cancelar</button>
+          <button type="button" id="borrar-episodio" class="peligro" hidden>Borrar episodio</button>
         </div>
       </form>
     </section>
@@ -99,6 +100,8 @@
         <button type="button" id="mes-siguiente" class="secundario" aria-label="Mes siguiente">›</button>
       </div>
       <div id="calendario"></div>
+      <p class="ayuda">Toca un día para ver, corregir o borrar lo apuntado, o para añadir un episodio.</p>
+      <div id="detalle-dia" hidden></div>
       <div class="leyenda">
         <span><i class="nivel-0"></i> sin dolor</span>
         <span><i class="nivel-1"></i> leve (1–3)</span>

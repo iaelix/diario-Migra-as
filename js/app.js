@@ -117,7 +117,10 @@
   }
 
   $$('.pestanas button').forEach(function (b) {
-    b.addEventListener('click', function () { mostrar(b.dataset.vista); });
+    b.addEventListener('click', function () {
+      if (b.dataset.vista === 'registrar' && !form.id.value) volverA = 'historial';
+      mostrar(b.dataset.vista);
+    });
   });
   document.addEventListener('click', function (ev) {
     var a = ev.target.closest('[data-ir]');
@@ -183,6 +186,7 @@
     $('#lista-tomas').innerHTML = '';
     $('#titulo-form').textContent = 'Nuevo episodio';
     $('#cancelar-edicion').hidden = true;
+    $('#borrar-episodio').hidden = true;
     pintarSelectsTomas();
   }
 
@@ -210,11 +214,21 @@
     (ep.tomas || []).forEach(filaToma);
     $('#titulo-form').textContent = 'Editar episodio';
     $('#cancelar-edicion').hidden = false;
+    $('#borrar-episodio').hidden = false;
   }
+
+  // Vista a la que volver al terminar de editar (historial o calendario).
+  var volverA = 'historial';
 
   $('#cancelar-edicion').addEventListener('click', function () {
     limpiarFormulario();
-    mostrar('historial');
+    mostrar(volverA);
+  });
+
+  $('#borrar-episodio').addEventListener('click', function () {
+    if (!borrarEpisodio(form.id.value)) return;
+    limpiarFormulario();
+    mostrar(volverA);
   });
 
   form.addEventListener('submit', function (ev) {
@@ -257,9 +271,11 @@
     else datos.episodios.push(ep);
     persistir();
     var editando = i >= 0;
+    var volver = editando || volverA === 'calendario';
     limpiarFormulario();
     avisar(editando ? 'Episodio actualizado.' : 'Episodio guardado.');
-    if (editando) mostrar('historial');
+    if (volver) mostrar(volverA);
+    volverA = 'historial';
   });
 
   // ---------- historial ----------
@@ -296,7 +312,10 @@
       return;
     }
     var eps = datos.episodios.slice().sort(function (a, b) { return b.inicio.localeCompare(a.inicio); });
-    cont.innerHTML = eps.map(function (ep) {
+    cont.innerHTML = eps.map(tarjetaEpisodio).join('');
+  }
+
+  function tarjetaEpisodio(ep) {
       var tomas = textoTomas(ep);
       return '<article class="tarjeta">' +
         '<div class="intensidad nivel-' + nivel(ep.intensidad) + '">' + ep.intensidad + '</div>' +
@@ -311,18 +330,21 @@
         '<button type="button" class="secundario" data-editar="' + esc(ep.id) + '">Editar</button>' +
         '<button type="button" class="peligro" data-borrar="' + esc(ep.id) + '">Borrar</button>' +
         '</div></article>';
-    }).join('');
+  }
+
+  function borrarEpisodio(id) {
+    if (!confirm('¿Borrar este episodio? No se puede deshacer.')) return false;
+    datos.episodios = datos.episodios.filter(function (e) { return e.id !== id; });
+    persistir();
+    avisar('Episodio borrado.');
+    return true;
   }
 
   $('#lista-episodios').addEventListener('click', function (ev) {
     var b = ev.target.closest('button');
     if (!b) return;
-    if (b.dataset.editar) editarEpisodio(b.dataset.editar);
-    if (b.dataset.borrar && confirm('¿Borrar este episodio? No se puede deshacer.')) {
-      datos.episodios = datos.episodios.filter(function (e) { return e.id !== b.dataset.borrar; });
-      persistir();
-      pintarHistorial();
-    }
+    if (b.dataset.editar) { volverA = 'historial'; editarEpisodio(b.dataset.editar); }
+    if (b.dataset.borrar && borrarEpisodio(b.dataset.borrar)) pintarHistorial();
   });
 
   // ---------- calendario ----------
@@ -352,12 +374,15 @@
       if (tomas[dia]) titulo += ', medicación aguda';
       if (iny[dia]) titulo += ', ' + iny[dia].join(', ');
       celdas.push('<div class="dia nivel-' + (i2 !== undefined ? Math.max(1, nivel(i2)) : 0) +
-        (dia === hoyStr ? ' hoy' : '') + '" title="' + titulo + '">' + d +
+        (dia === hoyStr ? ' hoy' : '') + (dia === diaSeleccionado ? ' seleccionado' : '') +
+        '" data-dia="' + dia + '" title="' + titulo + '">' + d +
         (tomas[dia] ? '<b class="punto-med">●</b>' : '') +
         (iny[dia] ? '<b class="punto-iny">▲</b>' : '') + '</div>');
     }
     return '<div class="mes">' + celdas.join('') + '</div>';
   }
+
+  var diaSeleccionado = '';
 
   function pintarCalendario() {
     var anio = mesVisible.getFullYear(), mes = mesVisible.getMonth();
@@ -368,7 +393,87 @@
     $('#calendario').innerHTML = htmlMes(anio, mes, r.intensidadPorDia, r.tomasPorDia);
     $('#resumen-mes').textContent = r.diasCefalea + ' días con dolor, ' + r.diasIntensos +
       ' intensos, ' + r.diasMedicacionAguda + ' días con medicación aguda.';
+    $$('#calendario .dia').forEach(function (c) {
+      c.setAttribute('role', 'button');
+      c.setAttribute('tabindex', '0');
+    });
+    pintarDetalleDia();
   }
+
+  // Panel bajo el calendario con lo apuntado el día pulsado.
+  function pintarDetalleDia() {
+    var cont = $('#detalle-dia');
+    var mesActual = E.aDia(mesVisible).slice(0, 7);
+    if (!diaSeleccionado || diaSeleccionado.slice(0, 7) !== mesActual) {
+      cont.hidden = true;
+      return;
+    }
+    var eps = datos.episodios.filter(function (e) { return E.diasDeEpisodio(e).indexOf(diaSeleccionado) >= 0; })
+      .sort(function (a, b) { return a.inicio.localeCompare(b.inicio); });
+    var iny = (datos.inyecciones || []).filter(function (x) { return x.fecha === diaSeleccionado; });
+    var preventivos = datos.meds.filter(function (m) { return m.tipo === 'preventivo'; });
+    var titulo = fechaLarga(diaSeleccionado);
+    cont.innerHTML = '<h3>' + esc(titulo.charAt(0).toUpperCase() + titulo.slice(1)) + '</h3>' +
+      (eps.length ? eps.map(tarjetaEpisodio).join('') : '<p class="ayuda">Sin episodios apuntados este día.</p>') +
+      iny.map(function (x) {
+        var m = medPorId(x.medId);
+        return '<p class="fila-iny"><b class="punto-iny">▲</b> ' + esc(m ? m.nombre : 'Preventivo') +
+          ' <button type="button" class="peligro" data-borrar-iny-dia="' + esc(x.id) + '">Borrar</button></p>';
+      }).join('') +
+      '<div class="acciones">' +
+      '<button type="button" data-nuevo-dia>+ Episodio este día</button>' +
+      (preventivos.length ? '<button type="button" class="secundario" data-iny-dia>+ ' +
+        (preventivos.length === 1 ? esc(preventivos[0].nombre.split(' (')[0]) : 'Preventivo') + ' este día</button>' : '') +
+      '</div>';
+    cont.hidden = false;
+  }
+
+  function seleccionarDia(celda) {
+    diaSeleccionado = celda.dataset.dia === diaSeleccionado ? '' : celda.dataset.dia;
+    pintarCalendario();
+    if (diaSeleccionado) $('#detalle-dia').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  $('#calendario').addEventListener('click', function (ev) {
+    var celda = ev.target.closest('.dia[data-dia]');
+    if (celda) seleccionarDia(celda);
+  });
+  $('#calendario').addEventListener('keydown', function (ev) {
+    var celda = ev.target.closest('.dia[data-dia]');
+    if (celda && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); seleccionarDia(celda); }
+  });
+
+  $('#detalle-dia').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button');
+    if (!b) return;
+    if (b.dataset.editar) { volverA = 'calendario'; editarEpisodio(b.dataset.editar); }
+    if (b.dataset.borrar && borrarEpisodio(b.dataset.borrar)) pintarCalendario();
+    if (b.hasAttribute('data-nuevo-dia')) {
+      var dia = diaSeleccionado;
+      volverA = 'calendario';
+      mostrar('registrar');
+      limpiarFormulario();
+      form.inicio.value = dia + ahora().slice(10);
+    }
+    if (b.hasAttribute('data-iny-dia')) {
+      var prev = datos.meds.filter(function (m) { return m.tipo === 'preventivo'; });
+      if (prev.length === 1) {
+        datos.inyecciones.push({ id: D.id(), medId: prev[0].id, fecha: diaSeleccionado });
+        persistir();
+        avisar('Administración registrada.');
+        pintarCalendario();
+      } else {
+        mostrar('medicacion');
+        formIny.fecha.value = diaSeleccionado;
+        formIny.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+    if (b.dataset.borrarInyDia && confirm('¿Borrar esta administración?')) {
+      datos.inyecciones = datos.inyecciones.filter(function (x) { return x.id !== b.dataset.borrarInyDia; });
+      persistir();
+      pintarCalendario();
+    }
+  });
 
   $('#mes-anterior').addEventListener('click', function () { mesVisible.setMonth(mesVisible.getMonth() - 1); pintarCalendario(); });
   $('#mes-siguiente').addEventListener('click', function () { mesVisible.setMonth(mesVisible.getMonth() + 1); pintarCalendario(); });
