@@ -7,7 +7,17 @@
   var CLAVE = 'diario-migranas:v1';
 
   function vacio() {
-    return { version: 1, ajustes: { paciente: '', neurologa: '' }, meds: [], episodios: [], inyecciones: [], importado: null };
+    return { version: 1, ajustes: { paciente: '', neurologa: '' }, meds: [], episodios: [], inyecciones: [], tests: { r: {}, midasHasta: '' }, importado: null };
+  }
+
+  function normalizarTests(t) {
+    var r = {};
+    var origen = t && t.r && typeof t.r === 'object' ? t.r : {};
+    Object.keys(origen).forEach(function (k) {
+      if (/^[a-z0-9]+\.[a-z0-9]+$/.test(k) && typeof origen[k] === 'number' && isFinite(origen[k])) r[k] = origen[k];
+    });
+    var hasta = t && typeof t.midasHasta === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.midasHasta) ? t.midasHasta : '';
+    return { r: r, midasHasta: hasta };
   }
 
   function normalizar(d) {
@@ -24,7 +34,10 @@
       inyecciones: Array.isArray(d.inyecciones) ? d.inyecciones.filter(function (x) {
         return x && typeof x.fecha === 'string';
       }) : [],
-      // Datos del diario anterior que esta app aún no muestra (cuestionarios…); se conservan tal cual.
+      // Respuestas de los tests: { r: { "test.pregunta": valor }, midasHasta: "YYYY-MM-DD" }.
+      // Si aún no hay, se recuperan las que vinieron del diario anterior.
+      tests: normalizarTests(d.tests || (d.importado && d.importado.tests)),
+      // Datos del diario anterior tal como llegaron; se conservan por si hicieran falta.
       importado: d.importado && typeof d.importado === 'object' ? d.importado : null
     };
   }

@@ -11,10 +11,11 @@
     <h1>Diario de migrañas</h1>
     <nav class="pestanas" role="tablist">
       <button data-vista="registrar" class="activa">Registrar</button>
-      <button data-vista="historial">Historial</button>
+      <button data-vista="historial">Resumen</button>
       <button data-vista="calendario">Calendario</button>
       <button data-vista="medicacion">Medicación</button>
       <button data-vista="informe">Informe</button>
+      <button data-vista="test">Test</button>
       <button data-vista="datos">Datos</button>
     </nav>
   </header>
@@ -88,7 +89,10 @@
 
     <!-- HISTORIAL -->
     <section id="vista-historial" class="vista">
-      <h2>Historial</h2>
+      <h2>Resumen por meses</h2>
+      <div id="resumen-meses"></div>
+      <h3>Días apuntados</h3>
+      <p class="ayuda">Toca un mes para ver sus días y corregirlos o borrarlos.</p>
       <div id="lista-episodios"></div>
     </section>
 
@@ -163,6 +167,20 @@
       <article id="informe"></article>
     </section>
 
+    <!-- TEST -->
+    <section id="vista-test" class="vista">
+      <h2 class="no-imprimir">Tests para la neuróloga</h2>
+      <p class="ayuda no-imprimir">Elige un test arriba y contesta. Las respuestas se guardan solas y salen con su puntuación.</p>
+      <div class="chips-test no-imprimir" id="test-nav"></div>
+      <div id="test-cuerpo" class="no-imprimir"></div>
+      <div class="acciones no-imprimir">
+        <button type="button" id="test-imprimir-uno">Imprimir / PDF este test</button>
+        <button type="button" id="test-imprimir-todos" class="secundario">Imprimir / PDF todos</button>
+        <button type="button" id="test-borrar-uno" class="peligro">Borrar respuestas de este test</button>
+      </div>
+      <div id="hojas-test" class="solo-imprimir"></div>
+    </section>
+
     <!-- DATOS -->
     <section id="vista-datos" class="vista">
       <h2>Datos</h2>
@@ -184,6 +202,7 @@
   <div id="aviso" class="aviso" role="status" hidden></div>
 
   <script src="js/estadisticas.js"></script>
+  <script src="js/tests.js"></script>
   <script src="js/datos.js"></script>
   <script src="js/app.js"></script>
 </body>
