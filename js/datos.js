@@ -7,7 +7,7 @@
   var CLAVE = 'diario-migranas:v1';
 
   function vacio() {
-    return { version: 1, ajustes: { paciente: '', neurologa: '' }, meds: [], episodios: [] };
+    return { version: 1, ajustes: { paciente: '', neurologa: '' }, meds: [], episodios: [], inyecciones: [], importado: null };
   }
 
   function normalizar(d) {
@@ -19,7 +19,13 @@
       meds: Array.isArray(d.meds) ? d.meds : [],
       episodios: Array.isArray(d.episodios) ? d.episodios.filter(function (e) {
         return e && typeof e.inicio === 'string';
-      }) : []
+      }) : [],
+      // Administraciones de preventivos (p. ej. inyección mensual): [{ id, medId, fecha }]
+      inyecciones: Array.isArray(d.inyecciones) ? d.inyecciones.filter(function (x) {
+        return x && typeof x.fecha === 'string';
+      }) : [],
+      // Datos del diario anterior que esta app aún no muestra (cuestionarios…); se conservan tal cual.
+      importado: d.importado && typeof d.importado === 'object' ? d.importado : null
     };
   }
 

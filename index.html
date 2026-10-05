@@ -105,6 +105,7 @@
         <span><i class="nivel-2"></i> moderado (4–6)</span>
         <span><i class="nivel-3"></i> intenso (7–10)</span>
         <span><b class="punto-med">●</b> medicación aguda</span>
+        <span><b class="punto-iny">▲</b> preventivo administrado</span>
       </div>
       <p id="resumen-mes" class="ayuda"></p>
     </section>
@@ -131,6 +132,16 @@
         <div class="acciones"><button type="submit">Guardar</button></div>
       </form>
       <div id="lista-meds"></div>
+      <div id="bloque-iny" hidden>
+        <h3>Administraciones de preventivos</h3>
+        <p class="ayuda">Para tratamientos que no se toman a diario, como una inyección mensual. Aparecen en el calendario (▲) y en el informe.</p>
+        <form id="form-iny" class="fila" autocomplete="off">
+          <label>Medicamento <select name="medId"></select></label>
+          <label>Fecha <input type="date" name="fecha" required></label>
+          <div class="acciones"><button type="submit">Registrar</button></div>
+        </form>
+        <div id="lista-iny"></div>
+      </div>
       <p class="ayuda">El tipo sirve para avisar de un posible uso excesivo de medicación aguda (≥10 días/mes con triptanes, ergóticos, opioides o combinados; ≥15 días/mes con analgésicos simples o AINE). Los preventivos no cuentan.</p>
     </section>
 
