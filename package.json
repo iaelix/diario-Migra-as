@@ -1,0 +1,9 @@
+{
+  "name": "diario-migranas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Diario de migrañas: registro de dolor, medicación e informes para la neuróloga.",
+  "scripts": {
+    "test": "node --test"
+  }
+}

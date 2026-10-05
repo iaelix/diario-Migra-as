@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diario de migrañas</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <header class="cabecera no-imprimir">
+    <h1>Diario de migrañas</h1>
+    <nav class="pestanas" role="tablist">
+      <button data-vista="registrar" class="activa">Registrar</button>
+      <button data-vista="historial">Historial</button>
+      <button data-vista="calendario">Calendario</button>
+      <button data-vista="medicacion">Medicación</button>
+      <button data-vista="informe">Informe</button>
+      <button data-vista="datos">Datos</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- REGISTRAR -->
+    <section id="vista-registrar" class="vista activa">
+      <h2 id="titulo-form">Nuevo episodio</h2>
+      <form id="form-episodio" autocomplete="off">
+        <input type="hidden" name="id">
+        <div class="fila">
+          <label>Inicio <input type="datetime-local" name="inicio" required></label>
+          <label>Fin <input type="datetime-local" name="fin"></label>
+          <label class="casilla"><input type="checkbox" name="enCurso"> Todavía en curso</label>
+        </div>
+
+        <fieldset>
+          <legend>Intensidad máxima: <output id="intensidad-valor">5</output>/10</legend>
+          <input type="range" name="intensidad" min="0" max="10" value="5" class="deslizador">
+          <div class="escala"><span>0 sin dolor</span><span>5 moderado</span><span>10 insoportable</span></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Localización</legend>
+          <div class="chips" data-campo="localizacion"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Tipo de dolor</legend>
+          <div class="chips" data-campo="caracter"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Síntomas acompañantes</legend>
+          <div class="chips" data-campo="sintomas"></div>
+          <label class="casilla"><input type="checkbox" name="aura"> Aura (visual, sensitiva o del lenguaje)</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Posibles desencadenantes</legend>
+          <div class="chips" data-campo="desencadenantes"></div>
+          <label>Otro <input type="text" name="desencadenanteOtro" placeholder="p. ej. olor a pintura"></label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Medicación tomada</legend>
+          <div id="lista-tomas"></div>
+          <button type="button" id="anadir-toma" class="secundario">+ Añadir toma</button>
+          <p class="ayuda" id="sin-medicamentos" hidden>Primero añade tus medicamentos en la pestaña <a href="#" data-ir="medicacion">Medicación</a>.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>¿Cuánto te limitó?</legend>
+          <div class="radios">
+            <label><input type="radio" name="discapacidad" value="ninguna"> Nada</label>
+            <label><input type="radio" name="discapacidad" value="leve"> Pude seguir, con dificultad</label>
+            <label><input type="radio" name="discapacidad" value="grave"> Tuve que parar / reducir mucho</label>
+            <label><input type="radio" name="discapacidad" value="cama"> Necesité reposo en cama</label>
+          </div>
+        </fieldset>
+
+        <label>Notas <textarea name="notas" rows="3" placeholder="Lo que quieras recordar para la consulta"></textarea></label>
+
+        <div class="acciones">
+          <button type="submit">Guardar episodio</button>
+          <button type="button" id="cancelar-edicion" class="secundario" hidden>Cancelar</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- HISTORIAL -->
+    <section id="vista-historial" class="vista">
+      <h2>Historial</h2>
+      <div id="lista-episodios"></div>
+    </section>
+
+    <!-- CALENDARIO -->
+    <section id="vista-calendario" class="vista">
+      <div class="nav-mes">
+        <button type="button" id="mes-anterior" class="secundario" aria-label="Mes anterior">‹</button>
+        <h2 id="titulo-mes"></h2>
+        <button type="button" id="mes-siguiente" class="secundario" aria-label="Mes siguiente">›</button>
+      </div>
+      <div id="calendario"></div>
+      <div class="leyenda">
+        <span><i class="nivel-0"></i> sin dolor</span>
+        <span><i class="nivel-1"></i> leve (1–3)</span>
+        <span><i class="nivel-2"></i> moderado (4–6)</span>
+        <span><i class="nivel-3"></i> intenso (7–10)</span>
+        <span><b class="punto-med">●</b> medicación aguda</span>
+      </div>
+      <p id="resumen-mes" class="ayuda"></p>
+    </section>
+
+    <!-- MEDICACIÓN -->
+    <section id="vista-medicacion" class="vista">
+      <h2>Mis medicamentos</h2>
+      <form id="form-med" class="fila" autocomplete="off">
+        <input type="hidden" name="id">
+        <label>Nombre y dosis <input type="text" name="nombre" required placeholder="p. ej. Sumatriptán 50 mg"></label>
+        <label>Tipo
+          <select name="tipo">
+            <option value="triptan">Triptán</option>
+            <option value="aine">Antiinflamatorio (AINE)</option>
+            <option value="analgesico">Analgésico simple (paracetamol, metamizol…)</option>
+            <option value="combinado">Analgésico combinado (con cafeína, codeína…)</option>
+            <option value="opioide">Opioide</option>
+            <option value="ergotico">Ergótico</option>
+            <option value="antiemetico">Antiemético</option>
+            <option value="preventivo">Preventivo (tratamiento de base)</option>
+            <option value="otro">Otro</option>
+          </select>
+        </label>
+        <div class="acciones"><button type="submit">Guardar</button></div>
+      </form>
+      <div id="lista-meds"></div>
+      <p class="ayuda">El tipo sirve para avisar de un posible uso excesivo de medicación aguda (≥10 días/mes con triptanes, ergóticos, opioides o combinados; ≥15 días/mes con analgésicos simples o AINE). Los preventivos no cuentan.</p>
+    </section>
+
+    <!-- INFORME -->
+    <section id="vista-informe" class="vista">
+      <div class="fila no-imprimir">
+        <label>Desde <input type="date" id="informe-desde"></label>
+        <label>Hasta <input type="date" id="informe-hasta"></label>
+        <div class="acciones">
+          <button type="button" class="secundario" data-periodo="1">Último mes</button>
+          <button type="button" class="secundario" data-periodo="3">3 meses</button>
+          <button type="button" class="secundario" data-periodo="6">6 meses</button>
+          <button type="button" id="imprimir">Imprimir / PDF</button>
+        </div>
+      </div>
+      <article id="informe"></article>
+    </section>
+
+    <!-- DATOS -->
+    <section id="vista-datos" class="vista">
+      <h2>Datos</h2>
+      <p>Todo se guarda <strong>solo en este navegador</strong>; nada se envía a ningún servidor. Haz copias de seguridad de vez en cuando, y antes de borrar los datos del navegador o cambiar de dispositivo.</p>
+      <form id="form-ajustes" class="fila" autocomplete="off">
+        <label>Tu nombre (aparece en el informe) <input type="text" name="paciente"></label>
+        <label>Neuróloga <input type="text" name="neurologa"></label>
+        <div class="acciones"><button type="submit">Guardar</button></div>
+      </form>
+      <div class="acciones">
+        <button type="button" id="exportar-json">Descargar copia de seguridad (.json)</button>
+        <label class="boton secundario">Restaurar copia… <input type="file" id="importar-json" accept="application/json,.json" hidden></label>
+        <button type="button" id="exportar-csv" class="secundario">Exportar episodios (.csv)</button>
+      </div>
+      <p id="estado-datos" class="ayuda" role="status"></p>
+    </section>
+  </main>
+
+  <div id="aviso" class="aviso" role="status" hidden></div>
+
+  <script src="js/estadisticas.js"></script>
+  <script src="js/datos.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
